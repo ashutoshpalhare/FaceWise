@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: facewise
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-facewise-dev-only-change-me}
+      POSTGRES_DB: facewise
+    volumes:
+      - facewise-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U facewise -d facewise"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://facewise:${POSTGRES_PASSWORD:-facewise-dev-only-change-me}@db:5432/facewise
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET (openssl rand -hex 32)}
+      SFACE_MIN_SIMILARITY: ${SFACE_MIN_SIMILARITY:-0.42}
+      LBPH_MIN_SIMILARITY: ${LBPH_MIN_SIMILARITY:-0.62}
+      FACE_API_MODEL_URL: ${FACE_API_MODEL_URL:-https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model}
+    ports:
+      - "3000:3000"
+    # NOTE: browsers only hand out camera access on HTTPS or localhost.
+    # Put a TLS-terminating proxy (Caddy/Traefik/nginx) in front in production.
+
+volumes:
+  facewise-data:
